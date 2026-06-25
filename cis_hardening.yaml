@@ -1,0 +1,19 @@
+---
+- name: Ubuntu 24.04 CIS 安全加固程序
+  hosts: all
+  become: yes  # 使用 sudo 權限執行
+  
+  tasks:
+    - name: "CIS 5.2.5 | 確保已禁用 SSH Root 帳號直接登入"
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: 重啟 SSH 服務
+
+  handlers:
+    - name: 重啟 SSH 服務
+      service:
+        name: ssh
+        state: restarted
