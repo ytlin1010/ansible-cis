@@ -1,0 +1,133 @@
+---
+- name: Ubuntu CIS 官方 USG 打底與 Auditd 精細化合規優化
+  hosts: all
+  become: true
+  vars:
+    # [組態變數] 請根據企業內控標準調整下方數值
+    ubuntu_pro_token: "C12nWHVqHUWFehXpLtgNw6DaLuZE7p"  # 可移至 Semaphore Environment 中保護
+    audit_max_log_file: 30                          # 單一 audit 日誌最大容量 (MB)
+    audit_num_logs: 5                               # 保留日誌檔案數量
+    audit_max_log_file_action: "ROTATE"             # 額滿時的處理機制 (ROTATE/SUSPEND/KEEP_LOGS)
+    semaphore_web_dir: "/var/www/html/usg-reports"  # 報告集中放置路徑（Semaphore 伺服器端）
+
+  tasks:
+    # ==========================================
+    # 階段一：Ubuntu Pro 與 USG 基礎修正打底
+    # ==========================================
+    - name: 檢查系統是否已啟用 Ubuntu Pro 訂閱
+      command: pro status
+      register: pro_status_check
+      changed_when: false
+
+    - name: 執行 Ubuntu Pro 金鑰附加 (若未附加)
+      command: "pro attach {{ ubuntu_pro_token }}"
+      when: '"This machine is not attached" in pro_status_check.stdout'
+      register: pro_attach_result
+      failed_when: pro_attach_result.rc != 0 and "already attached" not in pro_attach_result.stderr
+
+    - name: 確保已啟用 Ubuntu Security Guide (USG) 工具
+      command: pro enable usg
+      register: usg_enable_result
+      failed_when: usg_enable_result.rc != 0 and "already enabled" not in usg_enable_result.stderr
+      changed_when: '"enabling" in usg_enable_result.stdout'
+
+    - name: 安裝 USG 官方合規套件
+      apt:
+        name: usg
+        state: present
+        update_cache: true
+
+    - name: 執行大範圍官方 CIS Level 1 Server 基礎修正
+      command: usg fix cis_level1_server
+      ignore_errors: true # 預防部分不可自動修正條款中斷流程
+
+    # ==========================================
+    # 階段二：Auditd 服務安裝與精細化組態調整
+    # ==========================================
+    - name: 確保 auditd 及其外掛套件已正確安裝
+      apt:
+        name:
+          - auditd
+          - audispd-plugins
+        state: present
+
+    - name: 精細調整 auditd.conf — 修改日誌最大容量
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^max_log_file ='
+        line: "max_log_file = {{ audit_max_log_file }}"
+      notify: "重啟 auditd 服務"
+
+    - name: 精細調整 auditd.conf — 修改日誌保留數量
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^num_logs ='
+        line: "num_logs = {{ audit_num_logs }}"
+      notify: "重啟 auditd 服務"
+
+    - name: 精細調整 auditd.conf — 修改容量額滿應對策略
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^max_log_file_action ='
+        line: "max_log_file_action = {{ audit_max_log_file_action }}"
+      notify: "重啟 auditd 服務"
+
+    # ==========================================
+    # 階段三：客製化追加 CIS 稽核規則 (Rules)
+    # ==========================================
+    - name: 插入客製化 CIS auditd 監控規則 (依序執行)
+      blockinfile:
+        path: /etc/audit/rules.d/99-cis-custom.rules
+        create: yes
+        mode: '0640'
+        block: |
+          # 1. 監控系統時間與時區之變更
+          -a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change
+          -w /etc/localtime -p wa -k time-change
+
+          # 2. 監控使用者與群組身份識別資訊之修改
+          -w /etc/group -p wa -k identity
+          -w /etc/passwd -p wa -k identity
+          -w /etc/shadow -p wa -k identity
+          -w /etc/security/opasswd -p wa -k identity
+
+          # 3. 監控系統網路環境組態變更
+          -a always,exit -F arch=b64 -S sethostname -S sethostdomainname -k system-locale
+          -w /etc/issue -p wa -k system-locale
+          -w /etc/network -p wa -k system-locale
+      notify: "重新載入 auditd 規則"
+
+    # ==========================================
+    # 階段四：合規性審查與自動化報告生成
+    # ==========================================
+    - name: 觸發 USG 稽核並產出合規性 HTML 報告
+      command: usg audit cis_level1_server --results /var/log/usg-results.xml --report /var/log/usg-report.html
+      ignore_errors: true
+      register: usg_audit_output
+
+    - name: 自動將精美 HTML 報告收集至集中式 Web 伺服器
+      fetch:
+        src: /var/log/usg-report.html
+        dest: "{{ semaphore_web_dir }}/{{ inventory_hostname }}_cis_report.html"
+        flat: true
+      ignore_errors: true
+
+    - name: 於 Semaphore 工作日誌中直接印出稽核數據大綱
+      debug:
+        msg:
+          - "====== CIS 稽核完畢摘要 ======"
+          - "目標主機: {{ inventory_hostname }}"
+          - "HTML 報告傳送門: http://你的_SEMAPHORE_伺服器_IP/usg-reports/{{ inventory_hostname }}_cis_report.html"
+          - "詳細稽核文字摘要已記錄至本執行階段歷史 Log 中。"
+
+  # ==========================================
+  # Handlers：嚴格控制重啟與載入順序（最後一刻執行）
+  # ==========================================
+  handlers:
+    - name: "重新載入 auditd 規則"
+      command: augenrules --load
+
+    - name: "重啟 auditd 服務"
+      service:
+        name: auditd
+        state: restarted
