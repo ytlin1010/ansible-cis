@@ -18,7 +18,6 @@
       become_user: root
 
     - name: 找出剛剛生成的最新 HTML 稽核報告檔名
-      # 🟢 修正：改用 find 指令，只要 /var/lib/usg/ 底下有 .html 檔案就絕對抓得到
       shell: find /var/lib/usg/ -name "*.html" -type f -printf "%T@ %p\n" | sort -n | cut -d' ' -f2- | tail -n 1
       register: latest_html_report
       changed_when: false
@@ -31,7 +30,7 @@
         path: "{{ semaphore_web_dir }}"
         state: directory
         mode: '0755'
-      connection: local
+      connection: local  # 🟢 這裡要留著！因為開目錄是 Semaphore 容器本機的事
       become: false
 
     - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
@@ -39,6 +38,8 @@
         src: "{{ latest_html_report.stdout }}"
         dest: "{{ semaphore_web_dir }}/index.html"
         flat: yes
-      # 🟢 核心修正：下載回本地端不需要提權，配合 connection: local 使用
-      connection: local
-      become: false 
+      # 🟢 核心修正：拿掉 connection: local！讓它走 SSH 去遠端 .148 抓檔案
+      # 🟢 核心修正：加上 become: true，這樣才能讀取 .148 機器上屬於 root 的 usg 報告
+      become: true
+      become_method: sudo
+      become_user: root
