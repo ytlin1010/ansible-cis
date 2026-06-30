@@ -18,23 +18,27 @@
       become_user: root
 
     - name: 找出剛剛生成的最新 HTML 稽核報告檔名
-      shell: ls -t /var/lib/usg/usg-results-*.html | head -n 1
+      # 🟢 修正：改用 find 指令，只要 /var/lib/usg/ 底下有 .html 檔案就絕對抓得到
+      shell: find /var/lib/usg/ -name "*.html" -type f -printf "%T@ %p\n" | sort -n | cut -d' ' -f2- | tail -n 1
       register: latest_html_report
       changed_when: false
+      become: true
+      become_method: sudo
+      become_user: root
 
     - name: 確保 Semaphore 宿主機的報告目錄存在
-      # delegate_to: localhost
       file:
         path: "{{ semaphore_web_dir }}"
         state: directory
         mode: '0755'
       connection: local
-      become: false  # 🟢 核心修正：強制關閉本地任務的提權，避免 Docker 核心權限衝突
-      # become: true
+      become: false
 
     - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
       fetch:
         src: "{{ latest_html_report.stdout }}"
         dest: "{{ semaphore_web_dir }}/index.html"
         flat: yes
-      become: false  # 🟢 核心修正：下載回本地時同樣不需要提權，直接用一般身份寫入即可
+      # 🟢 核心修正：下載回本地端不需要提權，配合 connection: local 使用
+      connection: local
+      become: false 
