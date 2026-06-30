@@ -5,6 +5,7 @@
 
   vars:
     # [組態變數] 請根據企業內控標準調整下方數值 (Ubuntu Pro Token 已移至 Semaphore 保護)
+    ubuntu_pro_token: "{{ lookup('ansible.builtin.env', 'ubuntu_pro_token') }}"
     audit_max_log_file: 30                  # 單個 audit 日誌最大容量 (MB)
     audit_num_logs: 5                       # 保留日誌檔案數量
     audit_max_log_file_action: "ROTATE"     # 額滿時的處理機制 (ROTATE/SUSPEND/KEEP_LOGS)
