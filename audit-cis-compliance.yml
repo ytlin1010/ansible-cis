@@ -23,11 +23,12 @@
       changed_when: false
 
     - name: 確保 Semaphore 宿主機的報告目錄存在
-      delegate_to: localhost
+      # delegate_to: localhost
       file:
         path: "{{ semaphore_web_dir }}"
         state: directory
         mode: '0755'
+      connection: local
       become: true
 
     - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
