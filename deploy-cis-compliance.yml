@@ -4,7 +4,7 @@
   become: true
   vars:
     # [組態變數] 請根據企業內控標準調整下方數值
-    ubuntu_pro_token: {{ ubuntu_pro_token }}  # 可移至 Semaphore Environment 中保護
+    # ubuntu_pro_token: {{ ubuntu_pro_token }}  # 可移至 Semaphore Environment 中保護
     audit_max_log_file: 30                          # 單一 audit 日誌最大容量 (MB)
     audit_num_logs: 5                               # 保留日誌檔案數量
     audit_max_log_file_action: "ROTATE"             # 額滿時的處理機制 (ROTATE/SUSPEND/KEEP_LOGS)
