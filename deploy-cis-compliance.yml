@@ -75,6 +75,10 @@
         regexp: "^{{ item.key }} ="
         line: "{{ item.key }} = {{ item.value }}"
         state: present
+        # === 🟢 核心修正：強制為此任務指名最嚴格的 root 權限 ===
+      become: true
+      become_method: sudo
+      become_user: root
       loop:
         - { key: 'max_log_file', value: "{{ audit_max_log_file }}" }
         - { key: 'num_logs', value: "{{ audit_num_logs }}" }
