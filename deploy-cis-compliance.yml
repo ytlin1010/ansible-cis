@@ -17,11 +17,15 @@
       register: pro_status_check
       changed_when: false
       failed_when: false
-
+      
     - name: 執行 Ubuntu Pro 金鑰附加 (若未附加)
       command: pro attach "{{ ubuntu_pro_token }}"
       register: pro_attach_result
-      # 當 status 顯示為未附加時，才會動態帶入你設定的秘密密鑰
+      # === 核心修正：強制在此任務使用最嚴格的 root 身份與 shell 載入 ===
+      become: true
+      become_method: sudo
+      become_user: root
+      # =========================================================
       when: "'status: unattached' in pro_status_check.stdout or 'This machine is not attached' in pro_status_check.stdout"
       failed_when: 
         - pro_attach_result.rc != 0
