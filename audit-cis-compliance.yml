@@ -1,0 +1,37 @@
+---
+- name: Ubuntu CIS 官方安全合規自動化稽核 (Audit)
+  hosts: all
+  become: true
+
+  vars:
+    # 報告要集中打包送回 Semaphore 宿主機的暫存路徑
+    semaphore_web_dir: "/var/www/html/usg-reports"
+
+  tasks:
+    - name: 執行 CIS Level 1 系統安全合規稽核
+      command: usg audit cis_level1_server
+      register: usg_audit_result
+      # usg audit 只要系統有不合規就會回傳非 0 狀態碼，為了不讓劇本中斷，必須加上這行
+      failed_when: false
+      become: true
+      become_method: sudo
+      become_user: root
+
+    - name: 找出剛剛生成的最新 HTML 稽核報告檔名
+      shell: ls -t /var/lib/usg/usg-results-*.html | head -n 1
+      register: latest_html_report
+      changed_when: false
+
+    - name: 確保 Semaphore 宿主機的報告目錄存在
+      delegate_to: localhost
+      file:
+        path: "{{ semaphore_web_dir }}"
+        state: directory
+        mode: '0755'
+      become: true
+
+    - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
+      fetch:
+        src: "{{ latest_html_report.stdout }}"
+        dest: "{{ semaphore_web_dir }}/index.html"
+        flat: yes
