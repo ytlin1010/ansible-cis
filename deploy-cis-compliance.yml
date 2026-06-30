@@ -34,6 +34,10 @@
     - name: 確保已啟用 Ubuntu Security Guide (USG) 工具
       command: pro enable usg --beta
       register: usg_enable_result
+      # === 權限強制對齊：全面套用與 pro attach 相同的 root 提權 ===
+      become: true
+      become_method: sudo
+      become_user: root
       changed_when: "'enabling' in usg_enable_result.stdout"
       failed_when:
         - usg_enable_result.rc != 0
@@ -52,6 +56,10 @@
     - name: 執行 CIS Level 1 系統自動化合規修正 (Fix)
       command: usg fix cis_level1_server
       register: usg_fix_result
+      # === 權限強制對齊：修復時也必須以完整的 root 權限去改動系統設定 ===
+      become: true
+      become_method: sudo
+      become_user: root
       ignore_errors: yes
 
     - name: 優化 /etc/audit/auditd.conf 精細化日誌配置
