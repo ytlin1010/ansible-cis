@@ -29,6 +29,7 @@
         state: directory
         mode: '0755'
       connection: local
+      become: false  # 🟢 核心修正：強制關閉本地任務的提權，避免 Docker 核心權限衝突
       # become: true
 
     - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
@@ -36,3 +37,4 @@
         src: "{{ latest_html_report.stdout }}"
         dest: "{{ semaphore_web_dir }}/index.html"
         flat: yes
+      become: false  # 🟢 核心修正：下載回本地時同樣不需要提權，直接用一般身份寫入即可
