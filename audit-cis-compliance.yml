@@ -29,7 +29,7 @@
         state: directory
         mode: '0755'
       connection: local
-      become: true
+      # become: true
 
     - name: 將目標機器的 HTML 稽核報告下載回 Semaphore 伺服器
       fetch:
