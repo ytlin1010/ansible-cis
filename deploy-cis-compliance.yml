@@ -37,7 +37,7 @@
     - name: 更新 apt 套件快取快照
       apt:
         update_cache: yes
-      cache_valid_time: 3600
+        cache_valid_time: 3600
 
     - name: 安裝 USG 官方合規套件
       apt:
