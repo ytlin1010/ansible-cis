@@ -62,6 +62,13 @@
       become_user: root
       ignore_errors: yes
 
+    # ================= 🟢 核心修正：強制補上 auditd 安裝 =================
+    - name: 確保系統已安裝 auditd 審計守護程序套件
+      apt:
+        name: auditd
+        state: present
+    # ===================================================================
+
     - name: 優化 /etc/audit/auditd.conf 精細化日誌配置
       lineinfile:
         path: /etc/audit/auditd.conf
@@ -76,6 +83,8 @@
 
   handlers:
     - name: 重啟 auditd 服務
-      service:
-        name: auditd
-        state: restarted
+      command: service auditd restart
+      become: true
+      become_method: sudo
+      become_user: root
+      ignore_errors: yes
